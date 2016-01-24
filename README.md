@@ -1,3 +1,4 @@
+[![Stories in Ready](https://badge.waffle.io/felipead/cassandra-to-elasticsearch-sync.png?label=ready&title=Ready)](https://waffle.io/felipead/cassandra-to-elasticsearch-sync)
 `CASSANDRA <-> ELASTICSEARCH sync`
 ==================================
 
