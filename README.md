@@ -1,11 +1,11 @@
-`Cassandra => Elasticsearch sync`
-=================================
+`CASSANDRA => ELASTICSEARCH`
+============================
 
 [![Build Status](https://travis-ci.org/felipead/cassandra-elasticsearch-sync.svg?branch=master)](https://travis-ci.org/felipead/cassandra-elasticsearch-sync)
 [![Coverage Status](https://coveralls.io/repos/felipead/cassandra-elasticsearch-sync/badge.svg?branch=master)](https://coveralls.io/r/felipead/cassandra-elasticsearch-sync?branch=master)
 [![Stories in Ready](https://badge.waffle.io/felipead/cassandra-to-elasticsearch-sync.png?label=ready&title=Ready)](https://waffle.io/felipead/cassandra-to-elasticsearch-sync)
 
-This is a daemon service for efficient and incremental bidirectional sync between [Cassandra](https://cassandra.apache.org) and [Elasticsearch](https://www.elastic.co).
+This is a daemon service for efficient and incremental sync from [Cassandra](https://cassandra.apache.org) to [Elasticsearch](https://www.elastic.co).
 
 It is implemented in Python and uses my [Cassandra Logger](http://github.com/felipead/cassandra-logger) trigger to keep track of changes in the Cassandra database, thus making it very efficient. Synchronization is also idempotent and fault tolerant. This means that running the service with the same data more than once will produce exactly the same results.
 
@@ -43,52 +43,8 @@ which can be queried efficiently on Cassandra by:
 
         SELECT * FROM log WHERE time_uuid >= minTimeuuid('2015-03-01T00:35:00-03:00') ALLOW FILTERING;
 
-From the Elasticsearch end we can make a similar query by running:
-
-        $ curl -XGET 'http://localhost:9200/_all/_search' -d '{
-            "query": {
-                "range": {
-                    "_timestamp": { "gte": "2015-03-01T00:35:00-03:00" }
-                }
-            }
-        }'
-
-Due to Elasticsearch's architecture and the fact that it was built with search as a first class citizen, the above query does not suffer from performance degradation. Internally, the `_timestamp` field is stored as a long integer, which is automatically indexed.
-
-### Breaking Cycles
-
-One of the common problems faced in bidirectional syncing is how to avoid cycles. For instance, applying updates from Cassandra to Elasticsearch could generate another set of updates from Elasticsearch to Cassandra, which in turn would generate more updates from Cassandra to Elasticsearch, and so on... One could end up creating an infinite update cycle if he is not careful. Here is an example diagram:
-
-        CASSANDRA                                      ELASTICSEARCH
-        
-        {id: 1, name: "alice", timestamp: 1}   --->   {id: 1, name: "bob", timestamp: 0}
-        {id: 1, name: "alice", timestamp: 1}   <---   {id: 1, name: "alice", timestamp: 2}
-        {id: 1, name: "alice", timestamp: 3}   --->   {id: 1, name: "alice", timestamp: 2}
-        {id: 1, name: "alice", timestamp: 3}   <---   {id: 1, name: "alice", timestamp: 4}
-
-...and so on.
-
-There are several techniques to break such cycles. One that is simple and also very effective is to only apply updates from one database to another if data or *timestamp* is different. It is easy to see how this breaks the cycle in two iterations:
-
-        CASSANDRA                                      ELASTICSEARCH
-        
-        {id: 1, name: "alice", timestamp: 1}   ---->   {id: 1, name: "bob", timestamp: 0}
-        {id: 1, name: "alice", timestamp: 1}           {id: 1, name: "alice", timestamp: 1}
-
-### Versioning and Conflict Resolution
-
-This sync algorithm uses *timestamps* for versioning. As long as timestamps are constantly updated whenever a table or document is updated, we can assume the data that contains the most recent timestamp is also the most recent.
-
-For the unlikely scenario where two entities are updated on both databases at the exact same moment with millisecond precision, a conflict would be generated. It would be impossible to know which version to use. Solving this problem is not a trivial task and I chose to ignore it for now. In the event of such conflict, the service will leave each row as it is.
-
 LIMITATIONS
 -----------
-
-### Deletes
-
-It is not possible to sync delete updates from Elasticsearch to Cassandra. This is due to a limitation on how updates are queried on Elasticsearch.
-
-Deletes from Cassandra to Elasticsearch, however, are fully synchronized. If you want to delete an entity, delete it from the Cassandra end and the application will automatically delete it from Elasticsearch.
 
 ### Optimistic Concurrency Control
 
@@ -113,7 +69,7 @@ Elasticsearch has built-in Optimistic Concurrency Control support through a `_ve
             "price":  "1999.99"
         }
 
-One disadvantage is that your application code must keep the `_version` constantly updated with the current timestamp. We can't use Elasticsearch's built-in version numbering since both databases must rely on the same version number.     
+One disadvantage is that your application code must keep the `_version` constantly updated with the current timestamp. We can't use Elasticsearch's built-in version numbering since both databases must rely on the same version number.
 
 DATA MODELLING
 --------------
@@ -194,7 +150,7 @@ APPLICATION
 
 ### Usage
 
-At the first run the service performs a full sync between Cassandra and Elasticsearch. Depending on the volume of your data this might be a very time-consuming operation.
+At the first run the service performs a full sync from Cassandra to Elasticsearch. Depending on the volume of your data this might be a very time-consuming operation.
 
 The following syncs are going to be incremental and much faster. The application automatically stores, at all times, the current sync state in a file called `state.yaml`. In case the service is interrupted for any reason, you can restart it and it will continue operation from the last saved state. The implemented data synchronization algorithms are idempotent, thus there is no risk on creating duplicates or corrupting the database by syncing data more than once.
 
@@ -239,17 +195,6 @@ Start Cassandra and Elasticsearch, if they are not already running.
 Run the service through the script (it will run in foreground):
  
     ./run.sh
-
-KNOWN ISSUES
-------------
-
-- You can control which Cassandra tables you want to be synchronized by creating or dropping the logger trigger on each of them. However, the same is not possible with Elasticsearch. The service will read all indexes and all document types from Elasticsearch and try to sync them with Cassandra. This will fail if Cassandra does not have all the corresponding tables. However, a feature that would allow the user to specify in `settings.yaml` which indexes and keyspaces it wants to be synchronized is already planned.
-
-- Improve exception handling. Currently, if any exception occurs, like a connection timeout, the application quits. This is a deal breaker if the application needs to run as a daemon.
-
-- The solution was not tested yet in a multi-clustered environment. Therefore, please keep in mind it is still not suitable for production.
-
-- Currently, only bidirectional syncing is supported. However, in most cases it only makes sense to sync in one way, for instance, from Cassandra to Elasticsearch. A feature that would allow this behavior to be changed in  `settings.yaml` is already planned.
 
 AUTOMATED TESTS
 ---------------
