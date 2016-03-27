@@ -1,3 +1,5 @@
+**WORK IN PROGRESS, PLEASE COME BACK LATER**
+
 [![Build Status](https://travis-ci.org/felipead/cassandra-to-elasticsearch-sync.svg?branch=master)](https://travis-ci.org/felipead/cassandra-to-elasticsearch-sync)
 [![Coverage Status](https://coveralls.io/repos/felipead/cassandra-to-elasticsearch-sync/badge.svg?branch=master)](https://coveralls.io/r/felipead/cassandra-elasticsearch-sync?branch=master)
 [![TODO](https://badge.waffle.io/felipead/cassandra-to-elasticsearch-sync.png?label=ready&title=TODO)](https://waffle.io/felipead/cassandra-to-elasticsearch-sync)
